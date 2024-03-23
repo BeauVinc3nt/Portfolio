@@ -1,0 +1,23 @@
+SMS automation using Twilio APIs:
+
+In these types of projects, I am creating & testing different uses of the Twilio API and it's capabilities with distributing data. 
+
+For the projects I have created in this section, I have been using an unpaid "trial version" of the API, therefore have limited access to
+amount of API calls I can make aswell as being only able to send messages from the Twilio client to my personal phone number (when setting
+up a free Twilio account, user's are allowed to create one virtual number (Twilio acting as a client) and one verified number, where data
+can be sent to.)
+
+To make a successful API call to Twilio and send a message, the following details are required:
+SUCCESSFUL API CALL:
+- An account SID (Security Identifier - a unique ID number a computer/ domain uses to identify an account)
+- Account Auth Token (a generated token that is required to authenticate API requests)
+
+SUCCESSFUL SENDING OF SMS:
+- Verified user phone number - each trial account has permission to set a verified phone number. This is the phone number that the message contents
+are going to be sent to by the generated phone number.
+- Twilio virtual number - a generated phone number that Twilio hosts as a client.
+- Message body contents - the overall message being sent; this can include a variety of different information however in these projects, the message body
+will contain data sourced via specific API's (e.g. weather data, stock data, subject specific news data) and certain messages created by me as plain text for 
+testing purposes.
+
+
