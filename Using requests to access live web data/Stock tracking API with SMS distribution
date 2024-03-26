@@ -1,0 +1,102 @@
+# LIBRARIES:
+import requests     # Allows API requests to be made to website sourcing data.
+from twilio.rest import Client  # Allows connection between a server and my personal phone number to distribute stock messages.
+import os   # ENSURES SECURITY FOR 'PRIVATE' KEYS (E.G. ACCOUNT DETAILS ETC.): 
+
+# SECURITY MEASURE: accessing key/token values from local environment (desktop OS)
+TWILIO_ACC_SID = os.environ.get("TWILIO_ACC_SID")   
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUM = os.environ.get("TWILIO_VIRTUAL_NUM")
+
+# Picking out a stock name & company name from JSON file to locate stock specific data (e.g. Tesla). This can be modified dependant on certain stock the user wants to track. 
+STOCK_NAME = "TSLA"
+COMPANY_NAME = "Tesla Inc"
+
+# Endpoint URLs for websites I am grabbing data from. (Add keys + parameters to convert endpoint into functional URL.)
+STOCK_ENDPOINT = "https://www.alphavantage.co/query"
+NEWS_ENDPOINT = "https://newsapi.org/v2/everything"
+
+# API KEYS - ACCESSIBLE VIA SIGNING INTO A.V ACCOUNT.
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY") 
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
+
+# REQUIRED PARAMETERS (documentation specified):
+stock_params = {
+    "function": "TIME_SERIES_DAILY",
+    "symbol": STOCK_NAME,
+    "apikey": ALPHA_VANTAGE_API_KEY,
+}
+
+response = requests.get(STOCK_ENDPOINT, params=stock_params)    # Passing in API endpoint URL and its "parameters" required
+data = response.json()["Time Series (Daily)"]  # Pass output into JSON viewer to view the contents in a readable format.
+
+# USING LIST COMPREHENSION TO BREAK DOWN THE "DAILY TIME SERIES DATA" INTO ITS DICTIONARY KEYS SO THAT SPECIFIC DATA CAN BE LOCATED + REQUESTED FOR.
+data_list = [value for (key, value) in data.items()]        # Using list comprehension to pull out values from dictionary.
+
+# GRABBING HOLD OF YESTERDAY'S STOCK PRICE VIA KEYS.
+yesterday_data = data_list[0]       # Getting the first value of the "data list" within the Time Series Daily section of the stock API.
+yesterday_closing_price = yesterday_data["4. close"]
+print(f"Closing price (yesterday): {yesterday_closing_price}")  # Logging output into console.
+
+# GRABBING "DAY BEFORE YESTERDAY'S" CLOSING STOCK PRICE:
+day_before_yesteday_data = data_list[1] # Getting the second value of the "data list" as the first is index 0 (for yesterday/ most recent full day's performance.)
+day_before_yesterday_closing_price = day_before_yesteday_data["4. close"]   # locating "closing price" value for this specific data via dictionary keys.
+print(f"Closing price (day before yesterday): {day_before_yesterday_closing_price}")
+
+# FINDING THE DIFFERENCE IN CLOSING PRICE FOR THE STOCK BETWEEN THE TWO DAYS (YESTERDAY & THE DAY BEFORE YESTERDAY.)
+difference_between_days = float(yesterday_closing_price) - float(day_before_yesterday_closing_price)       # Comparing the days to calulate a difference.
+print(f"Price difference between the two days: {difference_between_days}")
+
+# CREATING AN ARROW INDICATOR TO TELL THE USER WHETHER THE STOCK PRICE HAS 'INCREASED' OR 'DECREASED' ACROSS THE 2 DAYS.
+up_down_indicator = None  # initial blank value.
+
+if difference_between_days > 0: # CONDITIONAL: CHECKING WHETHER THE PERCENTAGE CHANGE WAS AN 'INCREASE' OR A 'DECREASE'.
+    up_down_indicator = "🔺"
+else:
+    up_down_indicator = "🔻"
+
+
+# PERCENTAGE DIFFERENCE OF THE CLOSING PRICE BETWEEN THE 2 DAYS.
+percentage_difference_between_days = round((difference_between_days / float(yesterday_closing_price)) * 100, 2)   # Converting yesterday's closing price into float as it was initially a string.                                                                                                      
+print(f"Percentage difference between the two days: {percentage_difference_between_days}%\n")
+
+
+# CHECKING IF THE DIFFERENCE IN PERCENTAGE IS GREATER THAN 1% (1% INCREASE IN STOCK VALUE). IF SO, MAKE API CALL TO RECIEVE STOCK SPECIFIC NEWS.
+if abs(percentage_difference_between_days) > 1: # Taking the absolute value (if negative, still send notification.)
+    News_params = {
+        "apiKey": NEWS_API_KEY,
+        "q": COMPANY_NAME,      # "q" in documentation means the keyword/ phrases searched for in the articles.                    
+    }
+
+    # Creating a URL with the correct parameters (REQUIRED PARAMS ARE IN DOCUMENTATION)
+    news_response = requests.get(NEWS_ENDPOINT, params=News_params)
+
+    # Detecting the articles within the API under Tesla's name.
+    articles = news_response.json()["articles"]
+    three_articles = articles[:3]   # Using "list slicing" to get hold of the first three most recent articles for the stock.
+    """print(three_articles)"""
+
+    """
+        TEXT SENT FORMAT: 🔺/🔻 (percentage difference)%
+
+        Stock: (Stock Name) 
+        Headline: (title of news)
+        Author: (author who wrote the article)
+        Link to news: (url to news source)
+    """
+
+    # USING LIST COMPREHENSION TO FORM ARTICLES WITH NEWS CONTENTS FROM NEWS API.
+    formatted_stock_articles = [f"\n\nYOUR PERSONAL STOCK TRACKER:   🖥️\n\nStock: {STOCK_NAME}   {up_down_indicator}{percentage_difference_between_days}% \n\nHeadline: {article['title']}.\n\nAuthor: {article['author']} \n\nLink to news: {article['url']}" for article in three_articles]    # Using dictionary keys to specify the data requested (keys in JSON format.)
+    """print(formatted_stock_articles)"""
+
+    # Creating a client connection via Client object, passing in authentication details for Twilio to access virtual number + my phone number.
+    client = Client(TWILIO_ACC_SID, TWILIO_AUTH_TOKEN)
+
+    # Running loop for each article in the list to be send individually.                                    
+    for article in formatted_stock_articles:  
+        message = client.messages.create(       # COMPOSING MESSAGE CONTENTS:
+            body= article,
+            from_ = os.environ.get("TWILIO_VIRTUAL_NUM"),
+            to=os.environ.get("BEAU_PERSONAL_PHONE_NUMBER")
+        )
+
